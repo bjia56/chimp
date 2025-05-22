@@ -6,7 +6,7 @@ Chimp is an executable file format that allows polyglot binaries to be represent
 
 ## Motivation + How it works
 
-The [Cosmopolitan Libc](https://github.com/jart/cosmopolitan), which uses the [Actually Portable Executable](https://justine.lol/ape.html) (APE) file format, is the foremost implementation of a polyglot compiled binary that runs natively on multiple OSes and architectures.
+[Cosmopolitan Libc](https://github.com/jart/cosmopolitan), which uses the [Actually Portable Executable](https://justine.lol/ape.html) (APE) file format, is the foremost implementation of a polyglot compiled binary that runs natively on multiple OSes and architectures.
 While the APE file format produces executables that run as PE binaries on Windows and self-extracting scripts on Unix, recent changes in OpenBSD have made it difficult to run APEs, such as [restricting NUL bytes in scripts](https://www.undeadly.org/cgi?action=article;sid=20240924105732) and [pinning syscalls](https://man.openbsd.org/pinsyscalls.2).
 
 Chimp aims to solve this by wrapping APE programs with a meta-program that self-extracts the APE executable and optionally an appropriate APE loader, then running them.
