@@ -30,17 +30,17 @@ set D=%USERPROFILE%\\.chimp
 set E=%D%\\%N%.exe
 if not exist "%D%" mkdir "%D%"
 powershell -Command ^
- "$file = '%E%';" ^
- "if (Test-Path $file) {{" ^
- "$fs = [System.IO.File]::Open($file, 'Open', 'Read', 'Read');" ^
+ "$e = '%E%';" ^
+ "if (Test-Path $e) {{" ^
+ "$f = [System.IO.File]::Open($e, 'Open', 'Read', 'Read');" ^
  "try {{" ^
- "$fs.Seek({POSITION_OF_INDICATOR}, 'Begin') | Out-Null;" ^
- "$bytes = New-Object byte[] {len(indicator)};" ^
- "$count = $fs.Read($bytes, 0, {len(indicator)});" ^
- "$str = [System.Text.Encoding]::ASCII.GetString($bytes);" ^
- "if ($count -eq {len(indicator)} -and $str -eq '{indicator}') {{ exit 0 }}" ^
+ "$f.Seek({POSITION_OF_INDICATOR}, 'Begin') | Out-Null;" ^
+ "$b = New-Object byte[] {len(indicator)};" ^
+ "$c = $f.Read($b, 0, {len(indicator)});" ^
+ "$s = [System.Text.Encoding]::ASCII.GetString($b);" ^
+ "if ($c -eq {len(indicator)} -and $s -eq '{indicator}') {{ exit 0 }}" ^
  "else {{ exit 1 }}" ^
- "}} finally {{ $fs.Close() }}" ^
+ "}} finally {{ $f.Close() }}" ^
  "}} else {{ exit 1 }}"
 if %ERRORLEVEL% NEQ 0 (
 if exist %E% del %E%
