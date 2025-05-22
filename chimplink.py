@@ -133,7 +133,7 @@ fi
 }}
 if [ ! -e "$E" ] || [ "$(dd if="$E" bs=1 skip={POSITION_OF_INDICATOR} count={len(indicator)} 2>/dev/null)" != "{indicator}" ]; then
 rm -f "$E"
-dd if="$S" skip={EXE_START_MARKER} count={EXE_SIZE_MARKER} bs=1 2>/dev/null | b64 > "$E" || exit 1
+tail -c +$(expr {EXE_START_MARKER} + 1) "$S" | b64 > "$E" || exit 1
 chmod 755 "$E"
 fi
 """ + generate_os_conditionals(groups) + f"""
