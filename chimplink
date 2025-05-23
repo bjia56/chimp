@@ -94,7 +94,12 @@ k=$(uname -s 2>/dev/null) || k=unknown
 
         # Generate conditions for each architecture
         for arch in arches:
-            result += f"if" + "||".join([f' [ "$m" = {a} ] ' for a in arch]) + f""" && [ "$k" = {os_name} ]; then
+            if os_name == "SunOS" and "amd64" in arch:
+                # SunOS reports i86pc on all systems and require isainfo to check for 64-bit
+                result += f'if [ "$m" = i86pc ] && [ "$k" = {os_name} ] && [ $(isainfo -b) = 64 ]; then'
+            else:
+                result += f"if" + "||".join([f' [ "$m" = {a} ] ' for a in arch]) + f' && [ "$k" = {os_name} ]; then'
+            result += f"""
 dd if="$S" skip={INTERP_START_MARKER + str(counter)} count={INTERP_SIZE_MARKER + str(counter)} bs=1 2>/dev/null | b64 > "$I" || exit 1
 chmod 755 "$I" || exit 1
 exec "$I" "$E" "$@" || exit 1
@@ -134,7 +139,11 @@ fi
 }}
 if [ ! -e "$E" ] || [ "$(dd if="$E" bs=1 skip={POSITION_OF_INDICATOR} count={len(indicator)} 2>/dev/null)" != "{indicator}" ]; then
 rm -f "$E"
-tail -c +$(expr {EXE_START_MARKER} + 1) "$S" | b64 > "$E" || exit 1
+ex(){{
+i=$(expr {EXE_START_MARKER} + 1)
+tail -c +$i "$S" 2>/dev/null || tail +${{i}}c "$S" || exit 1
+}}
+ex | b64 > "$E" || exit 1
 chmod 755 "$E"
 fi
 """ + generate_os_conditionals(groups) + f"""
