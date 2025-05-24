@@ -2,7 +2,7 @@
 
 # Chimp
 
-Chimp is an executable file format that allows polyglot binaries to be represented safely in a single, cross-platform file that can be run on Windows, Mac, Linux, FreeBSD, OpenBSD, NetBSD, and more.
+Chimp is an executable file format that allows polyglot binaries to be represented safely in a single, cross-platform file that can be run on Windows, Mac, Linux, FreeBSD, OpenBSD, NetBSD, Solaris, and more.
 
 ## Motivation + How it works
 
