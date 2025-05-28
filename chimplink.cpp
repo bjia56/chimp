@@ -236,8 +236,6 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
         counter++;
     }
 
-    ss << "fi";
-
     return ss.str();
 }
 
