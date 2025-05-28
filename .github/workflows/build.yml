@@ -31,8 +31,6 @@ jobs:
           apelink \
             -s \
             -S "V=${{ github.sha }}" \
-            -l ${cosmo_bin}/ape-x86_64.elf \
-            -l ${cosmo_bin}/ape-aarch64.elf \
             -M ${cosmo_bin}/ape-m1.c \
             -o chimplink.exe \
             chimplink.com.dbg \
@@ -51,7 +49,10 @@ jobs:
 
       - name: Self-link
         run: |
+          cosmo_bin=$(dirname $(which cosmocc))
           ./chimplink.exe chimplink.exe chimplink ${{ github.sha }} \
+            ${cosmo_bin}/ape-x86_64.elf \
+            ${cosmo_bin}/ape-aarch64.elf \
             --os Linux blink-tiny-linux* \
             --os NetBSD blink-tiny-netbsd* \
             --os OpenBSD blink-tiny-openbsd* \

@@ -171,11 +171,13 @@ const std::string generate_batch_script(const std::string_view& indicator) {
     return ss.str();
 }
 
-const std::string generate_os_conditionals(const std::vector<OS>& os_list) {
+const std::string generate_os_conditionals(const std::vector<OS>& os_list, const std::vector<std::string_view>& generic_files) {
     std::stringstream ss;
     ss << "m=$(uname -m 2>/dev/null) || m=unknown\n"
        << "k=$(uname -s 2>/dev/null) || k=unknown\n"
-       << "if [ ! -e \"$I\" ]; then\n";
+       << "if [ -e \"$I\" ]; then\n"
+       << "exec \"$I\" \"$E\" \"$@\" || exit 1\n"
+       << "fi\n";
 
     size_t counter = 0;
     for (const auto& os : os_list) {
@@ -208,12 +210,38 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list) {
         }
     }
 
+    for (const auto& file : generic_files) {
+        const auto& archs = get_elf_architectures(file);
+        if (archs.empty()) {
+            continue;
+        }
+        ss << "if";
+        for (int i = 0; i < archs.size(); ++i) {
+            const auto& arch = archs[i];
+            if (i > 0) {
+                ss << " ||";
+            }
+            ss << " [ \"$m\" = " << arch << " ]";
+        }
+        if (contains(archs, "arm64")) {
+            ss << " && [ \"$k\" != Darwin ]";
+        }
+        ss << "; then\n"
+           << "dd if=\"$S\" skip=" << INTERP_START_MARKER << counter
+           << " count=" << INTERP_SIZE_MARKER << counter
+           << " bs=1 2>/dev/null | b64 > \"$I\" || exit 1\n"
+           << "chmod 755 \"$I\" || exit 1\n"
+           << "exec \"$I\" \"$E\" \"$@\" || exit 1\n"
+           << "fi\n";
+        counter++;
+    }
+
     ss << "fi";
 
     return ss.str();
 }
 
-const std::string generate_sh_script(const std::string_view& indicator, const std::vector<OS>& os_list) {
+const std::string generate_sh_script(const std::string_view& indicator, const std::vector<OS>& os_list, const std::vector<std::string_view>& generic_files) {
     std::string indicator_string = "V=" + std::string(indicator);
     std::stringstream ss;
     ss << "S=\"$0\"\n"
@@ -250,7 +278,7 @@ const std::string generate_sh_script(const std::string_view& indicator, const st
        << "ex | b64 > \"$E\" || exit 1\n"
        << "chmod 755 \"$E\" || exit 1\n"
        << "fi\n"
-       << generate_os_conditionals(os_list) << "\n"
+       << generate_os_conditionals(os_list, generic_files) << "\n"
        << "exec \"$E\" \"$@\" || exit 1\n"
        << "exit $?";
     return ss.str();
@@ -306,13 +334,14 @@ struct Args {
     std::string_view output_file;
     std::string_view indicator;
     std::vector<OS> os_list;
+    std::vector<std::string_view> generic_files;
 };
 
 const Args parse_args(int argc, char* argv[]) {
     Args args;
 
     if (argc < 4) {
-        std::cerr << "Usage: " << argv[0] << " <ape_executable> <output_file> <indicator> --os <os_name> <file1> <file2> ..."
+        std::cerr << "Usage: " << argv[0] << " <ape_executable> <output_file> <indicator> <file1> <file2> ... --os <os_name> <file1> <file2> ..."
                   << std::endl;
         exit(EXIT_FAILURE);
     }
@@ -334,8 +363,8 @@ const Args parse_args(int argc, char* argv[]) {
             }
             args.os_list.push_back(os);
         } else {
-            std::cerr << "Error: Unexpected argument: " << argv[i] << std::endl;
-            exit(EXIT_FAILURE);
+            // Treat any other argument as a generic file
+            args.generic_files.push_back(argv[i]);
         }
     }
 
@@ -345,7 +374,7 @@ const Args parse_args(int argc, char* argv[]) {
 int main(int argc, char* argv[]) {
     Args args = parse_args(argc, argv);
     std::string header = generate_batch_script(args.indicator) + "\n" +
-                         generate_sh_script(args.indicator, args.os_list) + "\n";
+                         generate_sh_script(args.indicator, args.os_list, args.generic_files) + "\n";
 
     std::stringstream script;
     size_t data_start = header.length();
@@ -367,6 +396,22 @@ int main(int argc, char* argv[]) {
             counter++;
             lines++;
         }
+    }
+
+    for (const auto& file : args.generic_files) {
+        std::string counter_str = std::to_string(counter);
+
+        std::string encoded_file = read_to_base64(file);
+        std::string file_size = pad_number(encoded_file.length(), INTERP_SIZE_MARKER.length() + counter_str.length());
+        std::string file_start = pad_number(data_start, INTERP_START_MARKER.length() + counter_str.length());
+
+        header = std::regex_replace(header, std::regex(INTERP_START_MARKER.data() + counter_str), file_start);
+        header = std::regex_replace(header, std::regex(INTERP_SIZE_MARKER.data() + counter_str), file_size);
+
+        script << encoded_file << "\n";
+        data_start += encoded_file.length() + 1;
+        counter++;
+        lines++;
     }
 
     std::string ape_file = read_to_base64(args.ape_executable);
