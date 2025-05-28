@@ -16,7 +16,7 @@ On platforms natively supported by Cosmopolitan and APE, the APE executable is e
 
 ## Creating a Chimp executable
 
-Chimp executables are created using `chimplink`. `chimplink.cpp` can be built with any C++ compiler, or download from GitHub Releases.
+Chimp executables are created using `chimplink`. `chimplink.cpp` can be built with any C++ compiler, or download from [GitHub Releases](https://github.com/bjia56/chimp/releases/latest).
 
 ```
 $ chimplink -h
