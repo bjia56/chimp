@@ -170,12 +170,12 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list) {
             if (archs.empty()) {
                 continue;
             }
-            ss << "if";
             if (os.name == "Solaris" && contains(archs, "amd64")) {
                 ss << "if [ \"$m\" = i86pc ] && [ \"$k\" = SunOS ] && [ $(isainfo -b) -eq 64 ] && cat /etc/os-release | grep -qi solaris ; then\n";
             } else if (os.name == "SunOS" && contains(archs, "amd64")) {
                 ss << "if [ \"$m\" = i86pc ] && [ \"$k\" = " << os.name << " ] && [ $(isainfo -b) -eq 64 ] && ; then\n";
             } else {
+                ss << "if";
                 for (int i = 0; i < archs.size(); ++i) {
                     const auto& arch = archs[i];
                     if (i > 0) {
