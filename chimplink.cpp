@@ -174,7 +174,8 @@ const std::string generate_batch_script(const std::string_view& indicator) {
 const std::string generate_os_conditionals(const std::vector<OS>& os_list) {
     std::stringstream ss;
     ss << "m=$(uname -m 2>/dev/null) || m=unknown\n"
-          "k=$(uname -s 2>/dev/null) || k=unknown\n";
+       << "k=$(uname -s 2>/dev/null) || k=unknown\n"
+       << "if [ ! -e \"$I\" ]; then\n";
 
     size_t counter = 0;
     for (const auto& os : os_list) {
@@ -206,6 +207,9 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list) {
             counter++;
         }
     }
+
+    ss << "fi";
+
     return ss.str();
 }
 
