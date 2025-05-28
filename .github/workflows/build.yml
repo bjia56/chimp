@@ -32,7 +32,6 @@ jobs:
             -s \
             -S "V=${{ github.sha }}" \
             -l ${cosmo_bin}/ape-x86_64.elf \
-            -l ${cosmo_bin}/ape-aarch64.elf \
             -M ${cosmo_bin}/ape-m1.c \
             -o chimplink.exe \
             chimplink.com.dbg \

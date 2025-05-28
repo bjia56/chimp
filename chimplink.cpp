@@ -223,10 +223,7 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
             }
             ss << " [ \"$m\" = " << arch << " ]";
         }
-        if (contains(archs, "arm64")) {
-            ss << " && [ \"$k\" != Darwin ]";
-        }
-        ss << "; then\n"
+        ss << " && [ \"$k\" != Darwin ]; then\n"
            << "dd if=\"$S\" skip=" << INTERP_START_MARKER << counter
            << " count=" << INTERP_SIZE_MARKER << counter
            << " bs=1 2>/dev/null | b64 > \"$I\" || exit 1\n"
