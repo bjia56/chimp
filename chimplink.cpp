@@ -12,6 +12,7 @@
 
 const std::string_view EXE_START_MARKER = "C0FFEExC0DE";
 const std::string_view EXE_SIZE_MARKER = "0x0x0x0x0x";
+const std::string_view EXE_LINES_MARKER = "2b2b";
 const std::string_view INTERP_START_MARKER = "BEEFxBEEF";
 const std::string_view INTERP_SIZE_MARKER = "L337xL337";
 
@@ -148,11 +149,22 @@ const std::string generate_batch_script(const std::string_view& indicator) {
        << " \"} else { exit 1 }\"\n"
        << "if %ERRORLEVEL% NEQ 0 (\n"
        << "if exist %E% del %E%\n"
+       << "where base64 >nul 2>nul\n"
+       << "if %ERRORLEVEL% NEQ 1 (\n"
+       << "more +" << EXE_LINES_MARKER << " \"%S\" | base64 -d > \"%E%\"\n"
+       << "goto :r\n"
+       << ")\n"
+       << "where openssl >nul 2>nul\n"
+       << "if %ERRORLEVEL% NEQ 1 (\n"
+       << "more +" << EXE_LINES_MARKER << " \"%S\" | openssl base64 -d > \"%E%\"\n"
+       << "goto :r\n"
+       << ")\n"
        << "powershell -Command ^\n"
        << " \"$s = Get-Content -Raw -Encoding UTF8 '%S%';\" ^\n"
        << " \"$b = $s.Substring(" << EXE_START_MARKER << ");\" ^\n"
        << " \"[IO.File]::WriteAllBytes('%E%', [Convert]::FromBase64String($b))\"\n"
        << ")\n"
+       << ":r\n"
        << "\"%E%\" %*\n"
        << "exit /b %ERRORLEVEL%\n"
        << "EOM";
@@ -276,6 +288,9 @@ const std::string pad_number(T number, size_t length) {
     std::ostringstream oss;
     oss << number;
     std::string str = oss.str();
+    if (str.length() > length) {
+        throw std::runtime_error("Number exceeds padding length: " + str);
+    }
     if (str.length() < length) {
         str.resize(length, ' ');
     }
@@ -331,6 +346,7 @@ int main(int argc, char* argv[]) {
     std::stringstream script;
     size_t data_start = header.length();
     size_t counter = 0;
+    size_t lines = std::count(header.begin(), header.end(), '\n');
     for (const auto& os : args.os_list) {
         for (const auto& file : os.files) {
             std::string counter_str = std::to_string(counter);
@@ -341,18 +357,21 @@ int main(int argc, char* argv[]) {
 
             header = std::regex_replace(header, std::regex(INTERP_START_MARKER.data() + counter_str), file_start);
             header = std::regex_replace(header, std::regex(INTERP_SIZE_MARKER.data() + counter_str), file_size);
-            script << encoded_file;
 
-            data_start += encoded_file.length();
+            script << encoded_file << "\n";
+            data_start += encoded_file.length() + 1;
             counter++;
+            lines++;
         }
     }
 
     std::string ape_file = read_to_base64(args.ape_executable);
     std::string ape_size = pad_number(ape_file.length(), EXE_SIZE_MARKER.length());
     std::string ape_start = pad_number(data_start, EXE_START_MARKER.length());
+    std::string ape_lines = pad_number(lines, EXE_LINES_MARKER.length());
     header = std::regex_replace(header, std::regex(EXE_START_MARKER.data()), ape_start);
     header = std::regex_replace(header, std::regex(EXE_SIZE_MARKER.data()), ape_size);
+    header = std::regex_replace(header, std::regex(EXE_LINES_MARKER.data()), ape_lines);
     script << ape_file;
 
     std::ofstream output(args.output_file.data());
