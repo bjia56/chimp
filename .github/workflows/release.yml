@@ -1,0 +1,57 @@
+name: Build and publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
+        type: string
+      beta:
+        required: true
+        type: boolean
+      dry_run:
+        required: true
+        type: boolean
+
+jobs:
+  validate-version:
+    name: Validate Version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if version is prefixed with 'v'
+        run: |
+          if [[ "${{ inputs.version }}" != v* ]]; then
+            echo "Error: Version must be prefixed with 'v'."
+            exit 1
+          fi
+
+  build:
+    name: Build
+    permissions:
+      contents: read
+      packages: write
+    needs: validate-version
+    uses: ./.github/workflows/build.yml
+
+  publish:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: chimplink
+          path: .
+
+      - name: Release
+        if: ${{ !inputs.dry_run }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: chimplink
+          tag_name: ${{ inputs.version }}
+          generate_release_notes: true
+          prerelease: ${{ inputs.beta }}
