@@ -50,7 +50,7 @@ jobs:
 
       - name: Self-link
         run: |
-          ./chimplink chimplink.exe chimplink ${{ github.sha }} \
+          ./chimplink.exe chimplink.exe chimplink ${{ github.sha }} \
             --os Linux blink-tiny-linux* \
             --os NetBSD blink-tiny-netbsd* \
             --os OpenBSD blink-tiny-openbsd* \
