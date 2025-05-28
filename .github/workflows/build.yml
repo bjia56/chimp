@@ -1,0 +1,63 @@
+name: Build chimplink
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  build:
+    name: Build chimplink
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up cosmocc
+        uses: bjia56/setup-cosmocc@v4
+        with:
+          version: 4.0.2
+
+      - name: Build
+        run: |
+          cosmoc++ -o chimplink chimplink.cpp
+
+      - name: Apelink
+        run: |
+          cosmo_bin=$(dirname $(which cosmocc))
+          apelink \
+            -s \
+            -S "V=${{ github.sha }}" \
+            -l ${cosmo_bin}/ape-x86_64.elf \
+            -l ${cosmo_bin}/ape-aarch64.elf \
+            -M ${cosmo_bin}/ape-m1.c \
+            -o chimplink.exe \
+            chimplink.com.dbg \
+            chimplink.aarch64.elf
+
+      - name: Download Blink
+        run: |
+          blinkverse=v4
+          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-powerpc64le-stripped
+          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-riscv64-stripped
+          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-s390x-stripped
+          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-netbsd10.0-aarch64-stripped
+          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-openbsd7.6-x86_64-stripped
+          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-openbsd7.6-aarch64-stripped
+          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-solaris11.4-x86_64-stripped
+
+      - name: Self-link
+        run: |
+          ./chimplink chimplink.exe chimplink ${{ github.sha }} \
+            --os Linux blink-tiny-linux* \
+            --os NetBSD blink-tiny-netbsd* \
+            --os OpenBSD blink-tiny-openbsd* \
+            --os Solaris blink-tiny-solaris* \
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: chimplink
+          path: chimplink
