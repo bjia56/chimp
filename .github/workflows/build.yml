@@ -41,9 +41,7 @@ jobs:
         run: |
           blinkverse=v6
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-i386-stripped
-          upx --best blink-tiny-linux-i386-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-powerpc64le-stripped
-          upx --best blink-tiny-linux-powerpc64le-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-riscv64-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-s390x-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-loongarch64-stripped
@@ -52,6 +50,11 @@ jobs:
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-openbsd7.6-aarch64-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-solaris11.4-x86_64-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-dragonflybsd6.4.0-x86_64-stripped
+
+          for file in blink-tiny-linux-i386-stripped blink-tiny-linux-powerpc64le-stripped; do
+            chmod +x $file
+            upx --best $file
+          done
 
       - name: Self-link
         run: |
