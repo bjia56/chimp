@@ -60,6 +60,7 @@ const ArchAliases& get_elf_architectures(const std::string_view& filename) {
         {{0x16, true, false}, {"s390x"}},
         {{0xf3, true, true}, {"riscv64"}},
         {{0xf3, false, true}, {"riscv32"}},
+        {{0x102, true, true}, {"loongarch64"}},
     };
 
     std::ifstream file(filename.data(), std::ios::binary);
