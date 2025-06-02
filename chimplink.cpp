@@ -15,6 +15,7 @@ const std::string_view EXE_SIZE_MARKER = "0x0x0x0x0x";
 const std::string_view EXE_LINES_MARKER = "2b2b";
 const std::string_view INTERP_START_MARKER = "BEEFxBEEF";
 const std::string_view INTERP_SIZE_MARKER = "L337xL337";
+const std::string_view MARKER_END = "E";
 
 // We assume the APE executable provided as input has a special
 // marker at the beginning to identify its uniqueness. This marker
@@ -201,8 +202,8 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
                 }
                 ss << " && [ \"$k\" = " << os.name << " ]; then\n";
             }
-            ss << "dd if=\"$S\" skip=" << INTERP_START_MARKER << counter
-               << " count=" << INTERP_SIZE_MARKER << counter
+            ss << "dd if=\"$S\" skip=" << INTERP_START_MARKER << counter << MARKER_END
+               << " count=" << INTERP_SIZE_MARKER << counter << MARKER_END
                << " bs=1 2>/dev/null | b64 > \"$I\" || exit 1\n"
                << "chmod 755 \"$I\" || exit 1\n"
                << "exec \"$I\" \"$E\" \"$@\" || exit 1\n"
@@ -225,8 +226,8 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
             ss << " [ \"$m\" = " << arch << " ]";
         }
         ss << " && [ \"$k\" != Darwin ]; then\n"
-           << "dd if=\"$S\" skip=" << INTERP_START_MARKER << counter
-           << " count=" << INTERP_SIZE_MARKER << counter
+           << "dd if=\"$S\" skip=" << INTERP_START_MARKER << counter << MARKER_END
+           << " count=" << INTERP_SIZE_MARKER << counter << MARKER_END
            << " bs=1 2>/dev/null | b64 > \"$I\" || exit 1\n"
            << "chmod 755 \"$I\" || exit 1\n"
            << "exec \"$I\" \"$E\" \"$@\" || exit 1\n"
@@ -381,11 +382,11 @@ int main(int argc, char* argv[]) {
             std::string counter_str = std::to_string(counter);
 
             std::string encoded_file = read_to_base64(file);
-            std::string file_size = pad_number(encoded_file.length(), INTERP_SIZE_MARKER.length() + counter_str.length());
-            std::string file_start = pad_number(data_start, INTERP_START_MARKER.length() + counter_str.length());
+            std::string file_size = pad_number(encoded_file.length(), INTERP_SIZE_MARKER.length() + counter_str.length() + MARKER_END.length());
+            std::string file_start = pad_number(data_start, INTERP_START_MARKER.length() + counter_str.length() + MARKER_END.length());
 
-            header = std::regex_replace(header, std::regex(INTERP_START_MARKER.data() + counter_str), file_start);
-            header = std::regex_replace(header, std::regex(INTERP_SIZE_MARKER.data() + counter_str), file_size);
+            header = std::regex_replace(header, std::regex(INTERP_START_MARKER.data() + counter_str + MARKER_END.data()), file_start);
+            header = std::regex_replace(header, std::regex(INTERP_SIZE_MARKER.data() + counter_str + MARKER_END.data()), file_size);
 
             script << encoded_file << "\n";
             data_start += encoded_file.length() + 1;
@@ -398,11 +399,11 @@ int main(int argc, char* argv[]) {
         std::string counter_str = std::to_string(counter);
 
         std::string encoded_file = read_to_base64(file);
-        std::string file_size = pad_number(encoded_file.length(), INTERP_SIZE_MARKER.length() + counter_str.length());
-        std::string file_start = pad_number(data_start, INTERP_START_MARKER.length() + counter_str.length());
+        std::string file_size = pad_number(encoded_file.length(), INTERP_SIZE_MARKER.length() + counter_str.length() + MARKER_END.length());
+        std::string file_start = pad_number(data_start, INTERP_START_MARKER.length() + counter_str.length() + MARKER_END.length());
 
-        header = std::regex_replace(header, std::regex(INTERP_START_MARKER.data() + counter_str), file_start);
-        header = std::regex_replace(header, std::regex(INTERP_SIZE_MARKER.data() + counter_str), file_size);
+        header = std::regex_replace(header, std::regex(INTERP_START_MARKER.data() + counter_str + MARKER_END.data()), file_start);
+        header = std::regex_replace(header, std::regex(INTERP_SIZE_MARKER.data() + counter_str + MARKER_END.data()), file_size);
 
         script << encoded_file << "\n";
         data_start += encoded_file.length() + 1;
