@@ -113,6 +113,169 @@ const ArchAliases& get_elf_architectures(const std::string_view& filename) {
     }
 }
 
+// (cputype, is64bit)
+struct MachoArch {
+    int32_t cputype;
+    bool is64bit;
+
+    bool operator==(const MachoArch& other) const {
+        return cputype == other.cputype && is64bit == other.is64bit;
+    }
+};
+
+template <>
+struct std::hash<MachoArch> {
+    size_t operator()(const MachoArch& a) const {
+        return hash<int32_t>()(a.cputype) ^ (hash<bool>()(a.is64bit) << 1);
+    }
+};
+
+// Mach-O magic numbers
+constexpr uint32_t MH_MAGIC      = 0xFEEDFACE;
+constexpr uint32_t MH_CIGAM      = 0xCEFAEDFE;
+constexpr uint32_t MH_MAGIC_64   = 0xFEEDFACF;
+constexpr uint32_t MH_CIGAM_64   = 0xCFFAEDFE;
+constexpr uint32_t FAT_MAGIC     = 0xCAFEBABE;
+constexpr uint32_t FAT_CIGAM     = 0xBEBAFECA;
+
+// Mach-O CPU types (subset)
+constexpr int32_t CPU_TYPE_X86        = 7;
+constexpr int32_t CPU_TYPE_X86_64     = (CPU_TYPE_X86 | 0x01000000);
+constexpr int32_t CPU_TYPE_ARM        = 12;
+constexpr int32_t CPU_TYPE_ARM64      = (CPU_TYPE_ARM | 0x01000000);
+constexpr int32_t CPU_TYPE_POWERPC    = 18;
+constexpr int32_t CPU_TYPE_POWERPC64  = (CPU_TYPE_POWERPC | 0x01000000);
+
+static const std::unordered_map<MachoArch, ArchAliases> MACHO_ARCH_MAP = {
+    {{CPU_TYPE_POWERPC, false}, {"Power Macintosh"}},
+};
+
+inline uint32_t swap32(uint32_t x) {
+    return ((x>>24)&0xff) | ((x<<8)&0xff0000) | ((x>>8)&0xff00) | ((x<<24)&0xff000000);
+}
+inline int32_t swap32(int32_t x) {
+    return static_cast<int32_t>(swap32(static_cast<uint32_t>(x)));
+}
+
+// Mach-O 32-bit header
+struct mach_header {
+    uint32_t magic;
+    int32_t cputype;
+    int32_t cpusubtype;
+    uint32_t filetype;
+    uint32_t ncmds;
+    uint32_t sizeofcmds;
+    uint32_t flags;
+};
+
+// Mach-O 64-bit header
+struct mach_header_64 {
+    uint32_t magic;
+    int32_t cputype;
+    int32_t cpusubtype;
+    uint32_t filetype;
+    uint32_t ncmds;
+    uint32_t sizeofcmds;
+    uint32_t flags;
+    uint32_t reserved;
+};
+
+// Fat header structs
+struct fat_header {
+    uint32_t magic;
+    uint32_t nfat_arch;
+};
+struct fat_arch {
+    int32_t cputype;
+    int32_t cpusubtype;
+    uint32_t offset;
+    uint32_t size;
+    uint32_t align;
+};
+
+const ArchAliases& get_macho_architectures(const std::string_view& filename) {
+    static ArchAliases result; // For returning from function (thread-unsafe, similar to your ELF usage)
+
+    std::ifstream file(filename.data(), std::ios::binary);
+    if (!file)
+        throw std::runtime_error("Failed to open file: " + std::string(filename));
+
+    uint32_t magic;
+    file.read(reinterpret_cast<char*>(&magic), sizeof(magic));
+    if (file.gcount() != 4)
+        throw std::runtime_error("File too short: " + std::string(filename));
+
+    bool is_fat = (magic == FAT_MAGIC || magic == FAT_CIGAM);
+    bool swap = (magic == FAT_CIGAM || magic == MH_CIGAM || magic == MH_CIGAM_64);
+
+    if (is_fat) {
+        // Universal binary
+        fat_header fh;
+        file.seekg(0, std::ios::beg);
+        file.read(reinterpret_cast<char*>(&fh), sizeof(fh));
+        if (swap) {
+            fh.nfat_arch = swap32(fh.nfat_arch);
+        }
+        if (fh.nfat_arch == 0 || fh.nfat_arch > 16)
+            throw std::runtime_error("Suspicious nfat_arch: " + std::string(filename));
+
+        // Read all contained architectures, return the first known
+        for (uint32_t i = 0; i < fh.nfat_arch; ++i) {
+            fat_arch arch;
+            file.read(reinterpret_cast<char*>(&arch), sizeof(arch));
+            int32_t cputype = swap ? swap32(arch.cputype) : arch.cputype;
+            // Seek to offset, read magic
+            uint32_t offset = swap ? swap32(arch.offset) : arch.offset;
+            std::streampos saved = file.tellg();
+            file.seekg(offset, std::ios::beg);
+            uint32_t inner_magic = 0;
+            file.read(reinterpret_cast<char*>(&inner_magic), 4);
+            bool is64 = (inner_magic == MH_MAGIC_64 || inner_magic == MH_CIGAM_64);
+
+            MachoArch mkey = {cputype, is64};
+            auto it = MACHO_ARCH_MAP.find(mkey);
+            if (it != MACHO_ARCH_MAP.end()) {
+                result = it->second;
+                return result;
+            }
+            file.seekg(saved);
+        }
+        throw std::runtime_error("Unknown architecture in FAT Mach-O: " + std::string(filename));
+    }
+
+    // Thin Mach-O (32 or 64)
+    file.seekg(0, std::ios::beg);
+    mach_header_64 hdr64;
+    file.read(reinterpret_cast<char*>(&hdr64), sizeof(hdr64));
+    if (file.gcount() < 8) // At least magic + cputype
+        throw std::runtime_error("File too short for Mach-O header: " + std::string(filename));
+
+    uint32_t m = hdr64.magic;
+    bool is64 = (m == MH_MAGIC_64 || m == MH_CIGAM_64);
+    int32_t cputype = swap ? swap32(hdr64.cputype) : hdr64.cputype;
+
+    MachoArch mkey = {cputype, is64};
+    auto it = MACHO_ARCH_MAP.find(mkey);
+    if (it != MACHO_ARCH_MAP.end()) {
+        result = it->second;
+        return result;
+    }
+    throw std::runtime_error("Unknown architecture for Mach-O file: " + std::string(filename));
+}
+
+const ArchAliases& get_architectures(const std::string_view& filename) {
+    try {
+        return get_elf_architectures(filename);
+    } catch (const std::runtime_error&) {
+        // If ELF parsing fails, try Mach-O
+        try {
+            return get_macho_architectures(filename);
+        } catch (const std::runtime_error&) {
+            throw std::runtime_error("Failed to determine architecture for non-ELF and non-Mach-O file: " + std::string(filename));
+        }
+    }
+}
+
 struct OS {
     std::string_view name;
     std::vector<std::string_view> files;
@@ -120,7 +283,7 @@ struct OS {
     const std::vector<ArchAliases> get_architectures() const {
         std::vector<ArchAliases> arches;
         for (const auto& file : files) {
-            arches.push_back(get_elf_architectures(file));
+            arches.push_back(::get_architectures(file));
         }
         return arches;
     }
@@ -198,7 +361,11 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
                     if (i > 0) {
                         ss << " ||";
                     }
-                    ss << " [ \"$m\" = " << arch << " ]";
+                    if (arch.find(" ") != std::string::npos) {
+                        ss << " [ \"$m\" = \"" << arch << "\" ]";
+                    } else {
+                        ss << " [ \"$m\" = " << arch << " ]";
+                    }
                 }
                 ss << " && [ \"$k\" = " << os.name << " ]; then\n";
             }
@@ -213,7 +380,7 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
     }
 
     for (const auto& file : generic_files) {
-        const auto& archs = get_elf_architectures(file);
+        const auto& archs = get_architectures(file);
         if (archs.empty()) {
             continue;
         }

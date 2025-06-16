@@ -39,7 +39,7 @@ jobs:
 
       - name: Download Blink
         run: |
-          blinkverse=v6
+          blinkverse=v7
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-i386-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-powerpc64le-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-riscv64-stripped
@@ -50,6 +50,7 @@ jobs:
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-openbsd7.6-aarch64-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-solaris11.4-x86_64-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-dragonflybsd6.4.0-x86_64-stripped
+          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-macos10.4-powerpc-stripped
 
           for file in blink-tiny-linux-i386-stripped blink-tiny-linux-powerpc64le-stripped; do
             chmod +x $file
@@ -66,7 +67,8 @@ jobs:
             --os NetBSD blink-tiny-netbsd* \
             --os OpenBSD blink-tiny-openbsd* \
             --os DragonFly blink-tiny-dragonflybsd* \
-            --os Solaris blink-tiny-solaris*
+            --os Solaris blink-tiny-solaris* \
+            --os Darwin blink-tiny-macos10.4-powerpc*
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
