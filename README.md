@@ -46,3 +46,9 @@ You can build your own Blink, or download prebuilts from [Blinkverse](https://gi
 On Windows, Chimp requires `cmd.exe` and `powershell.exe`.
 
 On Unix, Chimp requires a Bourne shell and the following programs or builtins: `uname`, `dd`, `chmod`, `exec`, `mkdir`, `base64`, `tail`, `expr`, `exit`. If `base64` is unavailable, a recent version of `python3` will be tried as a backup.
+
+## Gotchas
+
+The underlying APE executables launched by Chimp files do not preserve `argv[0]`, instead using the file path of the extracted APE's location. Chimp defines a `CHIMP_REAL_ARGV0` environment variable to store the location of the Chimp executable.
+
+On Windows, due to limitations of process creation, the APE executable is launched as a subprocess to the Chimp process.
