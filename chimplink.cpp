@@ -298,7 +298,7 @@ const std::string generate_batch_script(const std::string_view& indicator) {
        << "set N=%~n0\n"
        << "set D=%USERPROFILE%\\.chimp\n"
        << "set E=%D%\\%N%.exe\n"
-       << "set CHIMP_REAL_ARG0=%S%\n"
+       << "set \"CHIMP_REAL_ARGV0=%0\"\n"
        << "if not exist \"%D%\" mkdir \"%D%\"\n"
        << "powershell -Command ^\n"
        << " \"$e = '%E%';\" ^\n"
@@ -414,7 +414,7 @@ const std::string generate_sh_script(const std::string_view& indicator, const st
        << "D=\"$HOME/.chimp\"\n"
        << "E=\"$D/$N\"\n"
        << "I=\"$D/.interp\"\n"
-       << "export CHIMP_REAL_ARG0=\"$S\"\n"
+       << "export CHIMP_REAL_ARGV0=\"$0\"\n"
        << "if [ ! -d \"$D\" ]; then\n"
        << "mkdir -p \"$D\" || exit 1\n"
        << "fi\n"
@@ -507,7 +507,14 @@ const Args parse_args(int argc, char* argv[]) {
     Args args;
 
     if (argc < 4) {
-        std::cerr << "Usage: " << argv[0] << " <ape_executable> <output_file> <indicator> <file1> <file2> ... --os <os_name> <file1> <file2> ..."
+        std::cerr << "Usage: ";
+        const char *real_arg0 = getenv("CHIMP_REAL_ARGV0");
+        if (real_arg0) {
+            std::cerr << real_arg0;
+        } else {
+            std::cerr << argv[0];
+        }
+        std::cerr << " <ape_executable> <output_file> <indicator> <file1> <file2> ... --os <os_name> <file1> <file2> ..."
                   << std::endl;
         exit(EXIT_FAILURE);
     }
