@@ -422,7 +422,7 @@ const std::string generate_sh_script(const std::string_view& indicator, const st
        << "if type base64 >/dev/null 2>&1; then\n"
        << "base64 -d\n"
        << "exit $?\n"
-       << "elif type openssl >/dev/null 2>&1; then\n"
+       << "elif type openssl >/dev/null 2>&1 && ! openssl version | grep -q LibreSSL; then\n"
        << "openssl base64 -d\n"
        << "exit $?\n"
        << "else\n"
