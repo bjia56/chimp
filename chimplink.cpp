@@ -345,6 +345,32 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
        << "exec \"$I\" \"$E\" \"$@\" || exit 1\n"
        << "fi\n";
 
+    ss << "exb(){\n"
+       << "s=$2\n" // start
+       << "l=$3\n" // length
+       << "b=4096\n" // block size
+       << "sb=$((s/b*b))\n" // start block
+       << "e=$((s+l))\n" // end
+       << "eb=$(((e+b-1)/b*b))\n" // end block
+       << "if [ \"$s\" -gt \"$sb\" ];then\n"
+       << "h=$((b-(s-sb)))\n" // head bytes
+       << "p=$l\n" // first part length
+       << "if [ \"$h\" -lt \"$l\" ];then p=$h;fi\n"
+       << "dd if=\"$1\" bs=1 skip=$s count=$p 2>/dev/null\n"
+       << "s=$((s+p))\n"
+       << "l=$((l-p))\n"
+       << "fi\n"
+       << "a=$((l/b*b))\n" // aligned length
+       << "if [ $a -gt 0 ];then\n"
+       << "dd if=\"$1\" bs=$b skip=$((s/b)) count=$((a/b)) 2>/dev/null\n"
+       << "s=$((s+a))\n"
+       << "l=$((l-a))\n"
+       << "fi\n"
+       << "if [ $l -gt 0 ];then\n"
+       << "dd if=\"$1\" bs=1 skip=$s count=$l 2>/dev/null\n"
+       << "fi\n"
+       << "}\n";
+
     size_t counter = 0;
     for (const auto& os : os_list) {
         for (const auto& archs : os.get_architectures()) {
@@ -370,9 +396,9 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
                 }
                 ss << " && [ \"$k\" = " << os.name << " ]; then\n";
             }
-            ss << "dd if=\"$S\" skip=" << INTERP_START_MARKER << counter << MARKER_END
-               << " count=" << INTERP_SIZE_MARKER << counter << MARKER_END
-               << " bs=1 2>/dev/null | b64 > \"$I\" || exit 1\n"
+            ss << "exb \"$S\" " << INTERP_START_MARKER << counter << MARKER_END
+               << " " << INTERP_SIZE_MARKER << counter << MARKER_END
+               << " | b64 > \"$I\" || exit 1\n"
                << "chmod 755 \"$I\" || exit 1\n"
                << "exec \"$I\" \"$E\" \"$@\" || exit 1\n"
                << "fi\n";
@@ -394,9 +420,9 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
             ss << " [ \"$m\" = " << arch << " ]";
         }
         ss << " && [ \"$k\" != Darwin ]; then\n"
-           << "dd if=\"$S\" skip=" << INTERP_START_MARKER << counter << MARKER_END
-           << " count=" << INTERP_SIZE_MARKER << counter << MARKER_END
-           << " bs=1 2>/dev/null | b64 > \"$I\" || exit 1\n"
+           << "exb \"$S\" " << INTERP_START_MARKER << counter << MARKER_END
+           << " " << INTERP_SIZE_MARKER << counter << MARKER_END
+           << " | b64 > \"$I\" || exit 1\n"
            << "chmod 755 \"$I\" || exit 1\n"
            << "exec \"$I\" \"$E\" \"$@\" || exit 1\n"
            << "fi\n";
