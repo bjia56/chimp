@@ -51,6 +51,7 @@ jobs:
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-solaris11.4-x86_64-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-dragonflybsd6.4.0-x86_64-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-midnightbsd3.2.3-x86_64-stripped
+          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-haikur1beta5-x86_64-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-macos10.4-powerpc-stripped
 
           for file in blink-tiny-linux-i386-stripped blink-tiny-linux-powerpc64le-stripped; do
@@ -70,6 +71,7 @@ jobs:
             --os DragonFly blink-tiny-dragonflybsd* \
             --os MidnightBSD blink-tiny-midnightbsd* \
             --os Solaris blink-tiny-solaris* \
+            --os Haiku blink-tiny-haiku* \
             --os Darwin blink-tiny-macos10.4-powerpc*
 
       - name: Upload artifacts
