@@ -314,25 +314,25 @@ const std::string generate_batch_script(const std::string_view& indicator) {
        << " \"} finally { $f.Close() }\" ^\n"
        << " \"} else { exit 1 }\"\n"
        << "if %ERRORLEVEL% NEQ 0 (\n"
-       << "echo -n \"Extracting executable... \" >&2\n"
+       << "<nul set /p=Extracting executable... 1>&2\n"
        << "if exist %E% del %E%\n"
        << "where base64 >nul 2>nul\n"
        << "if %ERRORLEVEL% NEQ 1 (\n"
        << "more +" << EXE_LINES_MARKER << " \"%S\" | base64 -d > \"%E%\"\n"
-       << "echo \"complete.\" >&2\n"
+       << "echo complete. >&2\n"
        << "goto :r\n"
        << ")\n"
        << "where openssl >nul 2>nul\n"
        << "if %ERRORLEVEL% NEQ 1 (\n"
        << "more +" << EXE_LINES_MARKER << " \"%S\" | openssl base64 -d > \"%E%\"\n"
-       << "echo \"complete.\" >&2\n"
+       << "echo complete. >&2\n"
        << "goto :r\n"
        << ")\n"
        << "powershell -Command ^\n"
        << " \"$s = Get-Content -Raw -Encoding UTF8 '%S%';\" ^\n"
        << " \"$b = $s.Substring(" << EXE_START_MARKER << ");\" ^\n"
        << " \"[IO.File]::WriteAllBytes('%E%', [Convert]::FromBase64String($b))\"\n"
-       << "echo \"complete.\" >&2\n"
+       << "echo complete. >&2\n"
        << ")\n"
        << ":r\n"
        << "\"%E%\" %*\n"
@@ -400,7 +400,7 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
                 }
                 ss << " && [ \"$k\" = " << os.name << " ]; then\n";
             }
-            ss << "echo -n \"Extracting interpreter... \" >&2\n"
+            ss << "echo -n \"Extracting interpreter...\" >&2\n"
                << "exb \"$S\" " << INTERP_START_MARKER << counter << MARKER_END
                << " " << INTERP_SIZE_MARKER << counter << MARKER_END
                << " | b64 > \"$I\" || exit 1\n"
@@ -426,7 +426,7 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
             ss << " [ \"$m\" = " << arch << " ]";
         }
         ss << " && [ \"$k\" != Darwin ]; then\n"
-           << "echo -n \"Extracting interpreter... \" >&2\n"
+           << "echo -n \"Extracting interpreter...\" >&2\n"
            << "exb \"$S\" " << INTERP_START_MARKER << counter << MARKER_END
            << " " << INTERP_SIZE_MARKER << counter << MARKER_END
            << " | b64 > \"$I\" || exit 1\n"
@@ -473,7 +473,7 @@ const std::string generate_sh_script(const std::string_view& indicator, const st
        << "fi\n"
        << "}\n"
        << "if [ ! -e \"$E\" ] || [ \"$(dd if=\"$E\" skip=" << POSITION_OF_INDICATOR << " bs=1 count=" << indicator_string.length() << " 2>/dev/null)\" != \"" << indicator_string << "\" ]; then\n"
-       << "echo -n \"Extracting executable... \" >&2\n"
+       << "echo -n \"Extracting executable...\" >&2\n"
        << "rm -f \"$E\"\n"
        << "ex(){\n"
        << "i=$(expr " << EXE_START_MARKER << " + 1)\n"
