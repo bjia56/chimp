@@ -10,7 +10,7 @@ Chimp is a polyglot executable wrapper tool that creates cross-platform executab
 
 ### chimplink.cpp
 The main source file containing the chimplink executable builder. Key components:
-- **Binary format detection**: Supports ELF and Mach-O architecture detection
+- **Binary format detection**: Supports ELF, Mach-O, and XCOFF architecture detection
 - **Script generation**: Creates hybrid batch/shell scripts with embedded base64-encoded payloads
 - **Multi-OS support**: Handles platform-specific loaders and interpreters
 - **Architecture mapping**: Maps binary architectures to platform names for runtime detection
@@ -19,6 +19,7 @@ The main source file containing the chimplink executable builder. Key components
 The tool supports multiple architectures across different operating systems:
 - **ELF binaries**: x86, x86_64, ARM, AArch64, PowerPC variants, s390x, RISC-V, LoongArch64
 - **Mach-O binaries**: PowerPC (Power Macintosh)
+- **XCOFF binaries**: POWER, PowerPC 32-bit and 64-bit (AIX systems)
 - **Runtime detection**: Uses `uname -m` and `uname -s` for platform identification
 
 ## Building
@@ -47,7 +48,9 @@ clang++ -o chimplink chimplink.cpp
 ./chimplink prog.exe prog.cmd 12345 \
     --os Linux blink-linux-riscv64 blink-linux-s390x \
     --os NetBSD blink-netbsd-aarch64 \
-    --os OpenBSD blink-openbsd-x86_64 blink-openbsd-aarch64
+    --os OpenBSD blink-openbsd-x86_64 blink-openbsd-aarch64 \
+    --os AIX blink-aix-powerpc \
+    --os Haiku blink-haiku-x86_64
 ```
 
 ### Prerequisites
@@ -63,6 +66,7 @@ Generated executables contain:
 2. **Unix shell script**: Handles Unix execution path
 3. **Embedded payloads**: Base64-encoded APE executable and interpreters
 4. **Runtime caching**: Extracts and caches binaries in `~/.chimp/` (Unix) or `%USERPROFILE%\.chimp\` (Windows)
+5. **Extraction status messages**: Provides user feedback during binary extraction and interpreter setup
 
 ### Key Constants
 - `POSITION_OF_INDICATOR = 532`: Location of version indicator in APE files

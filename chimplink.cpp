@@ -130,6 +130,23 @@ struct std::hash<MachoArch> {
     }
 };
 
+// XCOFF architecture structure
+struct XcoffArch {
+    uint16_t cputype;
+    bool is64bit;
+
+    bool operator==(const XcoffArch& other) const {
+        return cputype == other.cputype && is64bit == other.is64bit;
+    }
+};
+
+template <>
+struct std::hash<XcoffArch> {
+    size_t operator()(const XcoffArch& arch) const {
+        return hash<uint16_t>()(arch.cputype) ^ (hash<bool>()(arch.is64bit) << 1);
+    }
+};
+
 // Mach-O magic numbers
 constexpr uint32_t MH_MAGIC      = 0xFEEDFACE;
 constexpr uint32_t MH_CIGAM      = 0xCEFAEDFE;
@@ -146,8 +163,45 @@ constexpr int32_t CPU_TYPE_ARM64      = (CPU_TYPE_ARM | 0x01000000);
 constexpr int32_t CPU_TYPE_POWERPC    = 18;
 constexpr int32_t CPU_TYPE_POWERPC64  = (CPU_TYPE_POWERPC | 0x01000000);
 
+// XCOFF magic numbers
+constexpr uint16_t XCOFF_MAGIC_32    = 0x01DF;  // 32-bit XCOFF
+constexpr uint16_t XCOFF_MAGIC_64    = 0x01F7;  // 64-bit XCOFF
+
+// XCOFF CPU types (from AIX header files)
+constexpr uint16_t XCOFF_CPU_POWER   = 0x0001;  // POWER architecture
+constexpr uint16_t XCOFF_CPU_PPC     = 0x0002;  // PowerPC
+constexpr uint16_t XCOFF_CPU_PPC64   = 0x0003;  // PowerPC 64-bit
+
+// XCOFF file header (32-bit)
+struct xcoff_filehdr {
+    uint16_t f_magic;     // Magic number
+    uint16_t f_nscns;     // Number of sections
+    uint32_t f_timdat;    // Time & date stamp
+    uint32_t f_symptr;    // File pointer to symtab
+    uint32_t f_nsyms;     // Number of symtab entries
+    uint16_t f_opthdr;    // sizeof(optional hdr)
+    uint16_t f_flags;     // Flags
+};
+
+// XCOFF file header (64-bit)
+struct xcoff_filehdr_64 {
+    uint16_t f_magic;     // Magic number
+    uint16_t f_nscns;     // Number of sections
+    uint32_t f_timdat;    // Time & date stamp
+    uint64_t f_symptr;    // File pointer to symtab
+    uint32_t f_nsyms;     // Number of symtab entries
+    uint16_t f_opthdr;    // sizeof(optional hdr)
+    uint16_t f_flags;     // Flags
+};
+
 static const std::unordered_map<MachoArch, ArchAliases> MACHO_ARCH_MAP = {
     {{CPU_TYPE_POWERPC, false}, {"Power Macintosh"}},
+};
+
+static const std::unordered_map<XcoffArch, ArchAliases> XCOFF_ARCH_MAP = {
+    {{XCOFF_CPU_POWER, false}, {"power", "powerpc", "ppc"}},
+    {{XCOFF_CPU_PPC, false}, {"powerpc", "ppc", "power"}},
+    {{XCOFF_CPU_PPC64, true}, {"powerpc64", "ppc64", "power64"}},
 };
 
 inline uint32_t swap32(uint32_t x) {
@@ -263,6 +317,54 @@ const ArchAliases& get_macho_architectures(const std::string_view& filename) {
     throw std::runtime_error("Unknown architecture for Mach-O file: " + std::string(filename));
 }
 
+const ArchAliases& get_xcoff_architectures(const std::string_view& filename) {
+    static ArchAliases result; // For returning from function (thread-unsafe, similar to ELF/Mach-O usage)
+
+    std::ifstream file(filename.data(), std::ios::binary);
+    if (!file) {
+        throw std::runtime_error("Failed to open file: " + std::string(filename));
+    }
+
+    // Read XCOFF header (both 32-bit and 64-bit share the same first few fields)
+    xcoff_filehdr hdr;
+    file.read(reinterpret_cast<char*>(&hdr), sizeof(xcoff_filehdr));
+    if (file.gcount() < sizeof(xcoff_filehdr)) {
+        throw std::runtime_error("File too short for XCOFF header: " + std::string(filename));
+    }
+
+    // Check for XCOFF magic numbers (AIX uses big-endian format)
+    uint16_t magic = ntohs(hdr.f_magic);
+    bool is64bit = false;
+
+    if (magic == XCOFF_MAGIC_32) {
+        is64bit = false;
+    } else if (magic == XCOFF_MAGIC_64) {
+        is64bit = true;
+    } else {
+        throw std::runtime_error("Not a valid XCOFF file: " + std::string(filename));
+    }
+
+    // For 64-bit XCOFF, we need to read additional fields, but CPU type is still in the same place
+    // The CPU type information in XCOFF is typically derived from the target machine
+    // For simplicity, we'll assume PowerPC family based on magic number
+    uint16_t cputype;
+    if (is64bit) {
+        cputype = XCOFF_CPU_PPC64;
+    } else {
+        // For 32-bit XCOFF, we assume PowerPC (could also be POWER, but PowerPC is more common)
+        cputype = XCOFF_CPU_PPC;
+    }
+
+    XcoffArch xcoff_arch = {cputype, is64bit};
+    auto it = XCOFF_ARCH_MAP.find(xcoff_arch);
+    if (it != XCOFF_ARCH_MAP.end()) {
+        result = it->second;
+        return result;
+    } else {
+        throw std::runtime_error("Unknown architecture for XCOFF file: " + std::string(filename));
+    }
+}
+
 const ArchAliases& get_architectures(const std::string_view& filename) {
     try {
         return get_elf_architectures(filename);
@@ -271,7 +373,12 @@ const ArchAliases& get_architectures(const std::string_view& filename) {
         try {
             return get_macho_architectures(filename);
         } catch (const std::runtime_error&) {
-            throw std::runtime_error("Failed to determine architecture for non-ELF and non-Mach-O file: " + std::string(filename));
+            // If Mach-O parsing fails, try XCOFF
+            try {
+                return get_xcoff_architectures(filename);
+            } catch (const std::runtime_error&) {
+                throw std::runtime_error("Failed to determine architecture for non-ELF, non-Mach-O, and non-XCOFF file: " + std::string(filename));
+            }
         }
     }
 }
@@ -384,7 +491,9 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
             if (os.name == "Solaris" && contains(archs, "amd64")) {
                 ss << "if [ \"$m\" = i86pc ] && [ \"$k\" = SunOS ] && [ $(isainfo -b) -eq 64 ] && cat /etc/os-release | grep -qi solaris ; then\n";
             } else if (os.name == "SunOS" && contains(archs, "amd64")) {
-                ss << "if [ \"$m\" = i86pc ] && [ \"$k\" = " << os.name << " ] && [ $(isainfo -b) -eq 64 ] && ; then\n";
+                ss << "if [ \"$m\" = i86pc ] && [ \"$k\" = " << os.name << " ] && [ $(isainfo -b) -eq 64 ]; then\n";
+            } else if (os.name == "AIX") {
+                ss << "if [ \"$k\" = AIX ]; then\n";
             } else {
                 ss << "if";
                 for (int i = 0; i < archs.size(); ++i) {
