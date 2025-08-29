@@ -551,6 +551,16 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
 
 const std::string generate_sh_script(const std::string_view& indicator, const std::vector<OS>& os_list, const std::vector<std::string_view>& generic_files) {
     std::string indicator_string = "V=" + std::string(indicator);
+
+    // Check if AIX is in the OS list
+    bool has_aix = false;
+    for (const auto& os : os_list) {
+        if (os.name == "AIX") {
+            has_aix = true;
+            break;
+        }
+    }
+
     std::stringstream ss;
     ss << "S=\"$0\"\n"
        << "N=$(basename \"$S\")\n"
@@ -561,8 +571,21 @@ const std::string generate_sh_script(const std::string_view& indicator, const st
        << "if [ ! -d \"$D\" ]; then\n"
        << "mkdir -p \"$D\" || exit 1\n"
        << "fi\n"
-       << "b64(){\n"
-       << "if type base64 >/dev/null 2>&1; then\n"
+       << "b64(){\n";
+
+    if (has_aix) {
+        // For AIX, check AIX first and use Python-based extraction
+        ss << "if [ \"$(uname -s 2>/dev/null)\" = AIX ]; then\n"
+           << "for v in 3 3.13 3.12 3.11 3.10 3.9; do\n"
+           << "if type python$v >/dev/null 2>&1; then\n"
+           << "python$v -c 'import base64,sys;sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))'\n"
+           << "exit $?\n"
+           << "fi\n"
+           << "done\n"
+           << "fi\n";
+    }
+
+    ss << "if type base64 >/dev/null 2>&1; then\n"
        << "base64 -d\n"
        << "exit $?\n"
        << "elif type gbase64 >/dev/null 2>&1; then\n"
