@@ -534,7 +534,7 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
             }
             ss << " [ \"$m\" = " << arch << " ]";
         }
-        ss << " && [ \"$k\" != Darwin ]; then\n"
+        ss << " && [ \"$k\" != Darwin ] && [ -z \"$USERPROFILE\" ]; then\n"
            << "echo -n \"Extracting interpreter... \" >&2\n"
            << "exb \"$S\" " << INTERP_START_MARKER << counter << MARKER_END
            << " " << INTERP_SIZE_MARKER << counter << MARKER_END
