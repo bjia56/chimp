@@ -39,8 +39,9 @@ jobs:
 
       - name: Download Blink
         run: |
-          blinkverse=v9
+          blinkverse=v10
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-i386-stripped
+          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-armv7l-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-powerpc64le-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-riscv64-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-s390x-stripped
