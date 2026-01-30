@@ -383,14 +383,20 @@ const ArchAliases& get_architectures(const std::string_view& filename) {
     }
 }
 
+struct OSFile {
+    std::string_view path;
+    bool is_interp;
+    std::string_view sha256;
+};
+
 struct OS {
     std::string_view name;
-    std::vector<std::string_view> files;
+    std::vector<OSFile> files;
 
     const std::vector<ArchAliases> get_architectures() const {
         std::vector<ArchAliases> arches;
         for (const auto& file : files) {
-            arches.push_back(::get_architectures(file));
+            arches.push_back(::get_architectures(file.path));
         }
         return arches;
     }
@@ -456,10 +462,7 @@ const std::string generate_batch_script(const std::string_view& indicator, const
 const std::string generate_os_conditionals(const std::vector<OS>& os_list, const std::vector<std::string_view>& generic_files) {
     std::stringstream ss;
     ss << "m=$(uname -m 2>/dev/null) || m=unknown\n"
-       << "k=$(uname -s 2>/dev/null) || k=unknown\n"
-       << "if [ -e \"$I\" ]; then\n"
-       << "exec \"$I\" \"$E\" \"$@\" || exit 1\n"
-       << "fi\n";
+       << "k=$(uname -s 2>/dev/null) || k=unknown\n";
 
     ss << "exb(){\n"
        << "s=$2\n" // start
@@ -489,10 +492,13 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
 
     size_t counter = 0;
     for (const auto& os : os_list) {
-        for (const auto& archs : os.get_architectures()) {
+        for (const auto& osfile : os.files) {
+            const auto& archs = ::get_architectures(osfile.path);
             if (archs.empty()) {
                 continue;
             }
+
+            // Generate platform detection conditional
             if (os.name == "Solaris" && contains(archs, "amd64")) {
                 ss << "if [ \"$m\" = i86pc ] && [ \"$k\" = SunOS ] && [ $(isainfo -b) -eq 64 ] && cat /etc/os-release | grep -qi solaris ; then\n";
             } else if (os.name == "SunOS" && contains(archs, "amd64")) {
@@ -514,14 +520,50 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
                 }
                 ss << " && [ \"$k\" = " << os.name << " ]; then\n";
             }
-            ss << "echo -n \"Extracting interpreter... \" >&2\n"
-               << "exb \"$S\" " << INTERP_START_MARKER << counter << MARKER_END
-               << " " << INTERP_SIZE_MARKER << counter << MARKER_END
-               << " | b64 > \"$I\" || exit 1\n"
-               << "chmod 755 \"$I\" || exit 1\n"
-               << "echo \"complete.\" >&2\n"
-               << "exec \"$I\" \"$E\" \"$@\" || exit 1\n"
-               << "fi\n";
+
+            // Generate extraction and execution based on is_interp flag
+            if (osfile.is_interp) {
+                // interp mode: extract APE first, then check/extract interpreter, and run it with APE as argument
+                ss << "exa\n"
+                   << "if [ ! -e \"$I\" ]; then\n"
+                   << "echo -n \"Extracting interpreter... \" >&2\n"
+                   << "exb \"$S\" " << INTERP_START_MARKER << counter << MARKER_END
+                   << " " << INTERP_SIZE_MARKER << counter << MARKER_END
+                   << " | b64 > \"$I\" || exit 1\n"
+                   << "chmod 755 \"$I\" || exit 1\n"
+                   << "echo \"complete.\" >&2\n"
+                   << "fi\n"
+                   << "exec \"$I\" \"$E\" \"$@\" || exit 1\n";
+            } else {
+                // Native mode: check if cached, validate with sha256, extract if needed
+                ss << "e=1\n";
+
+
+                // Add sha256 validation if hash is provided
+                if (!osfile.sha256.empty()) {
+                    ss << "if [ -e \"$E\" ]; then\n"
+                       << "s=\"" << osfile.sha256 << "\"\n"
+                       << "if [ -n \"$s\" ] && type sha256sum >/dev/null 2>&1; then\n"
+                       << "h=$(sha256sum \"$E\" 2>/dev/null | cut -d' ' -f1)\n"
+                       << "if [ \"$h\" = \"$s\" ]; then\n"
+                       << "e=0\n"
+                       << "fi\n"
+                       << "fi\n"
+                       << "fi\n";
+                }
+
+                ss << "if [ \"$e\" = 1 ]; then\n"
+                   << "echo -n \"Extracting executable... \" >&2\n"
+                   << "rm -f \"$E\"\n"
+                   << "exb \"$S\" " << INTERP_START_MARKER << counter << MARKER_END
+                   << " " << INTERP_SIZE_MARKER << counter << MARKER_END
+                   << " | b64 > \"$E\" || exit 1\n"
+                   << "chmod 755 \"$E\" || exit 1\n"
+                   << "echo \"complete.\" >&2\n"
+                   << "fi\n"
+                   << "exec \"$E\" \"$@\" || exit 1\n";
+            }
+            ss << "fi\n";
             counter++;
         }
     }
@@ -540,12 +582,15 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
             ss << " [ \"$m\" = " << arch << " ]";
         }
         ss << " && [ \"$k\" != Darwin ] && [ -z \"$USERPROFILE\" ]; then\n"
+           << "exa\n"
+           << "if [ ! -e \"$I\" ]; then\n"
            << "echo -n \"Extracting interpreter... \" >&2\n"
            << "exb \"$S\" " << INTERP_START_MARKER << counter << MARKER_END
            << " " << INTERP_SIZE_MARKER << counter << MARKER_END
            << " | b64 > \"$I\" || exit 1\n"
            << "chmod 755 \"$I\" || exit 1\n"
            << "echo \"complete.\" >&2\n"
+           << "fi\n"
            << "exec \"$I\" \"$E\" \"$@\" || exit 1\n"
            << "fi\n";
         counter++;
@@ -609,6 +654,7 @@ const std::string generate_sh_script(const std::string_view& indicator, const st
        << "exit 1\n"
        << "fi\n"
        << "}\n"
+       << "exa(){\n"
        << "e=1\n"
        << "if [ -e \"$E\" ]; then\n"
        << "if [ \"$(dd if=\"$E\" skip=" << POSITION_OF_INDICATOR << " bs=1 count=" << indicator_string.length() << " 2>/dev/null)\" = \"" << indicator_string << "\" ]; then\n"
@@ -634,7 +680,9 @@ const std::string generate_sh_script(const std::string_view& indicator, const st
        << "chmod 755 \"$E\" || exit 1\n"
        << "echo \"complete.\" >&2\n"
        << "fi\n"
+       << "}\n"
        << generate_os_conditionals(os_list, generic_files) << "\n"
+       << "exa\n"
        << "exec \"$E\" \"$@\" || exit 1\n"
        << "exit $?";
     return ss.str();
@@ -705,7 +753,7 @@ const Args parse_args(int argc, char* argv[]) {
         } else {
             std::cerr << argv[0];
         }
-        std::cerr << " <ape_executable> <output_file> <indicator> [--sha256 <hash>] <file1> <file2> ... --os <os_name> <file1> <file2> ..."
+        std::cerr << " <ape_executable> <output_file> <indicator> [--sha256 <hash>] <file1> <file2> ... --os <os_name> [--interp] <file1> <file2> [--native <file1> [--sha256 <hash>] <file2> [--sha256 <hash>]] ..."
                   << std::endl;
         exit(EXIT_FAILURE);
     }
@@ -728,11 +776,38 @@ const Args parse_args(int argc, char* argv[]) {
                 std::cerr << "Error: --os requires at least one OS name and one file." << std::endl;
                 exit(EXIT_FAILURE);
             }
+
             OS os;
             os.name = argv[++i];
-            while (i + 1 < argc && argv[i + 1][0] != '-') {
-                os.files.push_back(argv[++i]);
+            bool is_interp = true; // default to interp
+            while (i + 1 < argc && argv[i + 1] != "--os") {
+                if (std::string_view(argv[i + 1]) == "--interp") {
+                    is_interp = true;
+                    ++i;
+                    continue;
+                } else if (std::string_view(argv[i + 1]) == "--native") {
+                    is_interp = false;
+                    ++i;
+                    continue;
+                }
+
+                if (std::string_view(argv[i + 1]) == "--sha256") {
+                    if (is_interp) {
+                        std::cerr << "Error: --sha256 is not supported for interpreters." << std::endl;
+                        exit(EXIT_FAILURE);
+                    }
+                    if (i + 2 >= argc) {
+                        std::cerr << "Error: --sha256 requires a hash." << std::endl;
+                        exit(EXIT_FAILURE);
+                    }
+                    os.files.back().sha256 = argv[i + 2];
+                    i += 2;
+                    continue;
+                }
+
+                os.files.push_back({argv[++i], is_interp});
             }
+
             args.os_list.push_back(os);
         } else {
             // Treat any other argument as a generic file
@@ -756,7 +831,7 @@ int main(int argc, char* argv[]) {
         for (const auto& file : os.files) {
             std::string counter_str = std::to_string(counter);
 
-            std::string encoded_file = read_to_base64(file);
+            std::string encoded_file = read_to_base64(file.path);
             std::string file_size = pad_number(encoded_file.length(), INTERP_SIZE_MARKER.length() + counter_str.length() + MARKER_END.length());
             std::string file_start = pad_number(data_start, INTERP_START_MARKER.length() + counter_str.length() + MARKER_END.length());
 
