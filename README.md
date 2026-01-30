@@ -20,12 +20,14 @@ Chimp executables are created using `chimplink`. `chimplink.cpp` can be built wi
 
 ```
 $ chimplink -h
-Usage: ./chimplink <ape_executable> <outfile> <indicator> --os <os_name> <file1> <file2> ...
+Usage: ./chimplink <ape_executable> <outfile> <indicator> [--sha256 <hash>] --os <os_name> <file1> <file2> ...
 ```
 
 Before using `chimplink`, you need an APE program, such as one produced by `cosmocc`. Though `cosmocc` automates creating the APE from the x86_64 and aarch64 polyglot halves, it is highly recommended to perform the `apelink` step separately and pass in the `-S V=<indicator>` flag, where `<indicator>` can be replaced by your choice of string, such as a git commit SHA.
 This will embed an (ideally unique) identifier inside the APE for the resulting Chimp file to match against when deciding whether or not to extract the executable, when a pre-existing one from a previous run already exists on disk.
 Skipping the extraction and reusing a previously extracted copy significantly speeds up program startup, especially on Windows.
+
+If customizing the `apelink` invocation is not possible, use the `--sha256` flag to provide a checksum for the APE binary, which will be used as a fallback check before extraction. This requires the `sha256sum` and `cut` programs to be available at runtime on Unix systems; on Windows, no additional dependencies are required.
 
 Multiple custom loaders could be added to the output Chimp file, using the `--os` flag to first specify an OS kernel name, followed by a list of executables on disk. These executables should be built for different hardware architectures, targeting the specified OS. The OS name should exactly match the output of `uname -s` on the platform.
 
