@@ -396,7 +396,7 @@ struct OS {
     }
 };
 
-const std::string generate_batch_script(const std::string_view& indicator) {
+const std::string generate_batch_script(const std::string_view& indicator, const std::string_view& sha256) {
     std::string indicator_string = "V=" + std::string(indicator);
     std::stringstream ss;
     ss << ": <<EOM\n"
@@ -417,8 +417,13 @@ const std::string generate_batch_script(const std::string_view& indicator) {
        << " \"$c = $f.Read($b, 0, " << indicator_string.length() << ");\" ^\n"
        << " \"$s = [System.Text.Encoding]::ASCII.GetString($b);\" ^\n"
        << " \"if ($c -eq " << indicator_string.length() << " -and $s -eq '" << indicator_string << "') { exit 0 }\" ^\n"
-       << " \"else { exit 1 }\" ^\n"
        << " \"} finally { $f.Close() }\" ^\n"
+       << " \"$s = '" << sha256 << "';\" ^\n"
+       << " \"if ($s -ne '') {\" ^\n"
+       << " \"$h = (Get-FileHash -Path $e -Algorithm SHA256).Hash;\" ^\n"
+       << " \"if ($h -eq $s) { exit 0 }\" ^\n"
+       << " \"else { exit 1 }\" ^\n"
+       << " \"} else { exit 1 }\" ^\n"
        << " \"} else { exit 1 }\"\n"
        << "if %ERRORLEVEL% NEQ 0 (\n"
        << "<nul set /p=Extracting executable... 1>&2\n"
@@ -549,7 +554,7 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
     return ss.str();
 }
 
-const std::string generate_sh_script(const std::string_view& indicator, const std::vector<OS>& os_list, const std::vector<std::string_view>& generic_files) {
+const std::string generate_sh_script(const std::string_view& indicator, const std::vector<OS>& os_list, const std::vector<std::string_view>& generic_files, const std::string_view& sha256) {
     std::string indicator_string = "V=" + std::string(indicator);
 
     // Check if AIX is in the OS list
@@ -604,7 +609,21 @@ const std::string generate_sh_script(const std::string_view& indicator, const st
        << "exit 1\n"
        << "fi\n"
        << "}\n"
-       << "if [ ! -e \"$E\" ] || [ \"$(dd if=\"$E\" skip=" << POSITION_OF_INDICATOR << " bs=1 count=" << indicator_string.length() << " 2>/dev/null)\" != \"" << indicator_string << "\" ]; then\n"
+       << "e=1\n"
+       << "if [ -e \"$E\" ]; then\n"
+       << "if [ \"$(dd if=\"$E\" skip=" << POSITION_OF_INDICATOR << " bs=1 count=" << indicator_string.length() << " 2>/dev/null)\" = \"" << indicator_string << "\" ]; then\n"
+       << "e=0\n"
+       << "else\n"
+       << "s=\"" << sha256 << "\"\n"
+       << "if [ -n \"$s\" ] && type sha256sum >/dev/null 2>&1; then\n"
+       << "h=$(sha256sum \"$E\" 2>/dev/null | cut -d' ' -f1)\n"
+       << "if [ \"$h\" = \"$s\" ]; then\n"
+       << "e=0\n"
+       << "fi\n"
+       << "fi\n"
+       << "fi\n"
+       << "fi\n"
+       << "if [ \"$e\" = 1 ]; then\n"
        << "echo -n \"Extracting executable... \" >&2\n"
        << "rm -f \"$E\"\n"
        << "ex(){\n"
@@ -670,6 +689,7 @@ struct Args {
     std::string_view ape_executable;
     std::string_view output_file;
     std::string_view indicator;
+    std::string_view sha256;
     std::vector<OS> os_list;
     std::vector<std::string_view> generic_files;
 };
@@ -685,7 +705,7 @@ const Args parse_args(int argc, char* argv[]) {
         } else {
             std::cerr << argv[0];
         }
-        std::cerr << " <ape_executable> <output_file> <indicator> <file1> <file2> ... --os <os_name> <file1> <file2> ..."
+        std::cerr << " <ape_executable> <output_file> <indicator> [--sha256 <hash>] <file1> <file2> ... --os <os_name> <file1> <file2> ..."
                   << std::endl;
         exit(EXIT_FAILURE);
     }
@@ -694,7 +714,15 @@ const Args parse_args(int argc, char* argv[]) {
     args.output_file = argv[2];
     args.indicator = argv[3];
 
-    for (int i = 4; i < argc; ++i) {
+    if (argc > 4 && std::string_view(argv[4]) == "--sha256") {
+        if (argc < 6) {
+            std::cerr << "Error: --sha256 requires a hash." << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        args.sha256 = argv[5];
+    }
+
+    for (int i = args.sha256.empty() ? 4 : 6; i < argc; ++i) {
         if (std::string_view(argv[i]) == "--os") {
             if (i + 1 >= argc) {
                 std::cerr << "Error: --os requires at least one OS name and one file." << std::endl;
@@ -717,8 +745,8 @@ const Args parse_args(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
     Args args = parse_args(argc, argv);
-    std::string header = generate_batch_script(args.indicator) + "\n" +
-                         generate_sh_script(args.indicator, args.os_list, args.generic_files) + "\n";
+    std::string header = generate_batch_script(args.indicator, args.sha256) + "\n" +
+                         generate_sh_script(args.indicator, args.os_list, args.generic_files, args.sha256) + "\n";
 
     std::stringstream script;
     size_t data_start = header.length();

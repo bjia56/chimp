@@ -65,7 +65,8 @@ jobs:
       - name: Self-link
         run: |
           cosmo_bin=$(dirname $(which cosmocc))
-          ./chimplink.exe chimplink.exe chimplink ${{ github.sha }} \
+          sha256=$(sha256sum chimplink.exe | cut -d' ' -f1)
+          ./chimplink.exe chimplink.exe chimplink ${{ github.sha }} --sha256 $sha256 \
             ${cosmo_bin}/ape-x86_64.elf \
             ${cosmo_bin}/ape-aarch64.elf \
             --os Linux blink-tiny-linux* \
