@@ -10,16 +10,21 @@ on:
 jobs:
   build:
     name: Build chimplink
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up cosmocc
-        uses: bjia56/setup-cosmocc@v0.0.4
+        uses: bjia56/setup-cosmocc@v0.0.6
         with:
           version: 4.0.2
+
+      - name: Install upx
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y upx-ucl
 
       - name: Build
         run: |
