@@ -781,7 +781,6 @@ const Args parse_args(int argc, char* argv[]) {
             os.name = argv[++i];
             bool is_interp = true; // default to interp
             while (i + 1 < argc && std::string_view(argv[i + 1]) != "--os") {
-                std::cout << "Processing file argument: " << argv[i + 1] << std::endl;
                 if (std::string_view(argv[i + 1]) == "--interp") {
                     is_interp = true;
                     ++i;
