@@ -21,6 +21,11 @@ jobs:
         with:
           version: 4.0.2
 
+      - name: Set up zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: 0.14.0
+
       - name: Install upx
         run: |
           sudo apt-get update
@@ -29,6 +34,14 @@ jobs:
       - name: Build
         run: |
           cosmoc++ -o chimplink chimplink.cpp
+
+          for arch in x86 powerpc64le riscv64 s390x loongarch64; do
+            zig c++ -target ${arch}-linux-musl -s -o chimplink.${arch}-linux chimplink.cpp
+          done
+
+          for arch in x86 powerpc64le; do
+            upx --best chimplink.${arch}-linux
+          done
 
       - name: Apelink
         run: |
@@ -45,12 +58,7 @@ jobs:
       - name: Download Blink
         run: |
           blinkverse=v12
-          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-i386-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-armv7l-stripped
-          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-powerpc64le-stripped
-          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-riscv64-stripped
-          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-s390x-stripped
-          wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-linux-loongarch64-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-netbsd10.0-aarch64-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-openbsd7.6-x86_64-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-openbsd7.6-aarch64-stripped
@@ -62,11 +70,6 @@ jobs:
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-macos10.4-powerpc-stripped
           wget -q https://github.com/bjia56/blinkverse/releases/download/${blinkverse}/blink-tiny-hurd-x86_64-stripped
 
-          for file in blink-tiny-linux-i386-stripped blink-tiny-linux-powerpc64le-stripped; do
-            chmod +x $file
-            upx --best $file
-          done
-
       - name: Self-link
         run: |
           cosmo_bin=$(dirname $(which cosmocc))
@@ -74,7 +77,7 @@ jobs:
           ./chimplink.exe chimplink.exe chimplink ${{ github.sha }} --sha256 $sha256 \
             ${cosmo_bin}/ape-x86_64.elf \
             ${cosmo_bin}/ape-aarch64.elf \
-            --os Linux blink-tiny-linux* \
+            --os Linux blink-tiny-linux* --native $(for f in chimplink.*-linux; do echo -n "$f --sha256 $(sha256sum $f | cut -d' ' -f1) "; done) \
             --os NetBSD blink-tiny-netbsd* \
             --os OpenBSD blink-tiny-openbsd* \
             --os DragonFly blink-tiny-dragonflybsd* \
