@@ -56,6 +56,8 @@ $ chimplink prog.exe prog.cmd 12345 \
     --os Linux blink-linux-riscv64 --native prog.s390x --sha256 abcdef
 ```
 
+For a live example of bundling an APE, Blink interpreters, and platform-native executables, see this project's [build workflow](.github/workflows/build.yml).
+
 ## Runtime requirements
 
 On Windows, Chimp requires `cmd.exe` and `powershell.exe`.
