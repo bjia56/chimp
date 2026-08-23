@@ -526,7 +526,7 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
                 // interp mode: extract APE first, then check/extract interpreter, and run it with APE as argument
                 ss << "exa\n"
                    << "if [ ! -e \"$I\" ]; then\n"
-                   << "echo -n \"Extracting interpreter... \" >&2\n"
+                   << "printf %s \"Extracting interpreter... \" >&2\n"
                    << "exb \"$S\" " << INTERP_START_MARKER << counter << MARKER_END
                    << " " << INTERP_SIZE_MARKER << counter << MARKER_END
                    << " | b64 > \"$I\" || exit 1\n"
@@ -553,7 +553,7 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
                 }
 
                 ss << "if [ \"$e\" = 1 ]; then\n"
-                   << "echo -n \"Extracting executable... \" >&2\n"
+                   << "printf %s \"Extracting executable... \" >&2\n"
                    << "rm -f \"$E\"\n"
                    << "exb \"$S\" " << INTERP_START_MARKER << counter << MARKER_END
                    << " " << INTERP_SIZE_MARKER << counter << MARKER_END
@@ -584,7 +584,7 @@ const std::string generate_os_conditionals(const std::vector<OS>& os_list, const
         ss << " && [ \"$k\" != Darwin ] && [ -z \"$USERPROFILE\" ]; then\n"
            << "exa\n"
            << "if [ ! -e \"$I\" ]; then\n"
-           << "echo -n \"Extracting interpreter... \" >&2\n"
+           << "printf %s \"Extracting interpreter... \" >&2\n"
            << "exb \"$S\" " << INTERP_START_MARKER << counter << MARKER_END
            << " " << INTERP_SIZE_MARKER << counter << MARKER_END
            << " | b64 > \"$I\" || exit 1\n"
@@ -670,7 +670,7 @@ const std::string generate_sh_script(const std::string_view& indicator, const st
        << "fi\n"
        << "fi\n"
        << "if [ \"$e\" = 1 ]; then\n"
-       << "echo -n \"Extracting executable... \" >&2\n"
+       << "printf %s \"Extracting executable... \" >&2\n"
        << "rm -f \"$E\"\n"
        << "ex(){\n"
        << "i=$(expr " << EXE_START_MARKER << " + 1)\n"
