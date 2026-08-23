@@ -14,15 +14,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up cosmocc
-        uses: bjia56/setup-cosmocc@v0.0.6
+        uses: bjia56/setup-cosmocc@c0097c34319baeca1b41cc857ec5c643f2f5baf6 # v0.0.6
         with:
           version: 4.0.2
 
       - name: Set up zig
-        uses: mlugg/setup-zig@v1
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
           version: 0.14.0
 
@@ -89,7 +89,7 @@ jobs:
             --os GNU blink-tiny-hurd-x86_64*
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: chimplink
           path: chimplink
